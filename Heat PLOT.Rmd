@@ -1,0 +1,184 @@
+```{r}
+require(deSolve)
+require(ggplot2)
+require(patchwork)
+require(ggpubr)
+cols <- c("#D55E00","#E69F00","#F0E442","#66CC99","#009E73","white", "#CC79A7","#999999","#56B4E9")
+
+##### Parameters
+# constraint on community member isolation
+C1max <- 1000
+# constraint on traveller isolation
+C2max <- 30
+# transmission rate
+beta<-.0002
+# importation rate
+theta<-1
+mu<-0.334
+# relative transmissibility of travellers
+c<-1
+T<-1000
+
+# This is designed to trigger termination of the simulation when I1>0.5
+rootfun <- function(t, y, parameters){
+  I1 = y[2]
+  # However, with importations, it doesn't make sense to have this as
+  # the endpoint of the simulation, so instead I just set Imin = 0 and have
+  # the simulation end at T=100.
+  y1 = 1 - I1
+  return(y1)
+}
+
+SI<-function(t, y, parameters){
+  S = y[1]
+  I1 = y[2]
+  I2 = y[3]
+  C1 = y[4]
+  C2 = y[5]
+
+  if(C1 > C1max){
+    u1 = 0
+  }
+  if(C2 > C2max){
+    u2 = 0
+  }
+
+  dS = - beta*S*(I1 + c*I2)
+  dI1 = beta*S*(I1 + c*I2) - mu*I1 - u1*I1
+  dI2 = theta - 2*mu*I2 - u2*I2
+  dC1 = u1*I1
+  dC2 = u2*I2
+  return(list(c(dS,dI1,dI2,dC1,dC2)))
+}
+stratMx = NULL
+u1vec <- seq(2,0,-.025)
+u2vec <- seq(3,0,-.025)
+
+for(i in seq(1,length(u1vec))){
+  u1 = u1vec[i]
+  for(j in seq(1,length(u2vec))){
+    u2 = u2vec[j]
+  out <- ode(y = c(S=5000,I1=10,I2=1,C1=0,C2=0), parms = NULL, times = seq(0,T,1), func = SI, events = list(func = NULL, root = TRUE, terminalroot = 1), rootfun=rootfun, method = "radau")
+  out<- data.frame(out)
+if(max(out$I1)<=10 & max(out$time)<T & max(out$C1)<C1max & max(out$C2)<C2max){
+  outcome = "elimination"
+} else if(max(out$I1)>10 & max(out$C1)<C1max & max(out$C2)>=C2max & max(out$time)<T){
+  outcome = "mit/circ"
+} else if(max(out$I1)>10 & max(out$C1)>=C1max & max(out$C2)<C2max& max(out$time)<T){
+  outcome = "circ/mit"
+} else if(max(out$I1)>10 & max(out$C1)<C1max & max(out$C2)<C2max& max(out$time)<T){
+  outcome = "mitigation"
+} else if(max(out$time)==T){
+  outcome = "no end"
+} else if(max(out$I1)>10 & max(out$C1)>=C1max & max(out$C2)>=C2max& max(out$time)<T){
+  outcome = "circuit breaker"
+  }
+
+J = cumsum(beta*out$S*(out$I1+c*out$I2)*diff(c(0,out$time)))
+stratMx = rbind(stratMx, data.frame(u1 = u1, u2 = u2, outcome = outcome, J=J, T = max(out$time)))
+}}
+
+g1=ggplot(stratMx, aes(u1, u2, fill= outcome)) +
+  geom_tile()+xlab("Community isolation daily max, u1max")+ylab("Traveler isolation daily max, u2max")+
+  ggtitle("Low importations: strategy")+
+  scale_fill_manual(values=cols, breaks = c("elimination", "mitigation", "mit/circ", "circ/mit", "circuit breaker"))+theme_classic()+theme(legend.title=element_blank()) +
+  theme(
+  plot.title = element_text(size = 20),       # Title size
+  axis.title = element_text(size = 30),       # Axis title size
+  axis.text = element_text(size = 30),        # Axis text size
+  legend.text = element_text(size = 20) )      # Legend text size
+
+theta <- 2
+stratMx2 = NULL
+for(i in seq(1,length(u1vec))){
+  u1 = u1vec[i]
+  for(j in seq(1,length(u2vec))){
+    u2 = u2vec[j]
+    out <- ode(y = c(S=5000,I1=10,I2=1,C1=0,C2=0), parms = NULL, times = seq(0,T,1), func = SI, events = list(func = NULL, root = TRUE, terminalroot = 1), rootfun=rootfun, method = "radau")
+    out<- data.frame(out)
+    if(max(out$I1)<=10 & max(out$time)<T & max(out$C1)<C1max & max(out$C2)<C2max){
+      outcome = "elimination"
+    } else if(max(out$I1)>10 & max(out$C1)<C1max & max(out$C2)>=C2max & max(out$time)<T){
+      outcome = "mit/circ"
+    } else if(max(out$I1)>10 & max(out$C1)>=C1max & max(out$C2)<C2max& max(out$time)<T){
+      outcome = "circ/mit"
+    } else if(max(out$I1)>10 & max(out$C1)<C1max & max(out$C2)<C2max& max(out$time)<T){
+      outcome = "mitigation"
+    } else if(max(out$time)==T){
+      outcome = "no end"
+    } else if(max(out$I1)>10 & max(out$C1)>=C1max & max(out$C2)>=C2max& max(out$time)<T){
+      outcome = "circuit breaker"
+    }
+    J = cumsum(beta*out$S*(out$I1+c*out$I2)*diff(c(0,out$time)))
+    stratMx2 = rbind(stratMx2, data.frame(u1 = u1, u2 = u2, outcome = outcome, J=J, T = max(out$time)))
+  }}
+```
+
+
+```{r}
+g2=ggplot(stratMx2, aes(u1, u2, fill= outcome)) +
+  geom_tile()+xlab("Community isolation daily max, u1max")+ylab("Traveler isolation daily max, u2max")+
+  ggtitle("High importations: strategy")+
+  scale_fill_manual(values=cols, breaks = c("elimination", "mitigation", "mit/circ", "circ/mit", "circuit breaker"))+theme_classic()+ theme(legend.title=element_blank()) +
+  theme(
+  plot.title = element_text(size = 20),       # Title size
+  axis.title = element_text(size = 30),       # Axis title size
+  axis.text = element_text(size = 30),        # Axis text size
+  legend.text = element_text(size = 20) )      # Legend text size
+
+g4=ggplot(stratMx, aes(u1, u2, fill= T)) +
+  geom_tile()+xlab("Community isolation daily max, u1max")+ylab("Traveler isolation daily max, u2max")+
+  ggtitle("Low importations: duration of outbreak")+
+  scale_fill_gradient(low = cols[3], high = "black")+theme_classic()+ theme(legend.title=element_blank()) +
+  theme(
+  plot.title = element_text(size = 20),       # Title size
+  axis.title = element_text(size = 30),       # Axis title size
+  axis.text = element_text(size = 30),        # Axis text size
+  legend.text = element_text(size = 20) )      # Legend text size
+
+g5=ggplot(stratMx, aes(u1, u2, fill= J)) +
+  geom_tile()+xlab("Community isolation daily max, u1max")+ylab("Traveler isolation daily max, u2max")+
+  ggtitle("Low importations: new cases")+
+  scale_fill_gradient(low = cols[2], high = "black")+theme_classic()+ theme(legend.title=element_blank()) +
+  theme(
+  plot.title = element_text(size = 20),       # Title size
+  axis.title = element_text(size = 30),       # Axis title size
+  axis.text = element_text(size = 30),        # Axis text size
+  legend.text = element_text(size = 20) )      # Legend text size
+
+g6=ggplot(stratMx2, aes(u1, u2, fill= T)) +
+  geom_tile()+xlab("Community isolation daily max, u1max")+ylab("Traveler isolation daily max, u2max")+
+  ggtitle("High importations: duration of outbreak")+
+  scale_fill_gradient(low = cols[3], high = "black")+theme_classic()+ theme(legend.title=element_blank()) +
+  theme(
+  plot.title = element_text(size = 20),       # Title size
+  axis.title = element_text(size = 30),       # Axis title size
+  axis.text = element_text(size = 30),        # Axis text size
+  legend.text = element_text(size = 20) )      # Legend text size
+
+g7=ggplot(stratMx2, aes(u1, u2, fill= J)) +
+  geom_tile()+xlab("Community isolation daily max, u1max")+ylab("Traveler isolation daily max, u2max")+
+  ggtitle("High importations: new cases")+
+  scale_fill_gradient(low = cols[2], high = "black")+theme_classic()+ theme(legend.title=element_blank()) +
+  theme(
+  plot.title = element_text(size = 20),       # Title size
+  axis.title = element_text(size = 30),       # Axis title size
+  axis.text = element_text(size = 30),        # Axis text size
+  legend.text = element_text(size = 20) )      # Legend text size
+
+```
+
+
+```{r}
+g8=(g1+g2)+plot_annotation(tag_levels = 'A') & theme(plot.tag = element_text(size = 25))
+g8
+#ggsave("~/Desktop/Amy R codes/figures/Heat_map1.png", width = 30, height = 20, units = "cm")
+
+```
+
+
+```{r}
+g9 = (g4+g6)/(g5+g7)+plot_annotation(tag_levels = 'A') & theme(plot.tag = element_text(size = 25))
+g9 
+#ggsave("~/Desktop/Amy R codes/figures/Heat_map2.png", width = 25, height = 30, units = "cm")
+```

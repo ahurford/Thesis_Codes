@@ -1,0 +1,293 @@
+---
+title: "Code for Figure 4.3: The effect of parameters on the initial change in the number of community
+infections."
+date: Aug 08, 2024
+---
+
+
+```{r}
+
+#PROBLEM 1
+
+require(ggplot2)
+require(patchwork)
+
+cols <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7", "#66CC99")
+
+# Parameters
+beta <- 0.0002
+mu <- 0.334
+c <- 0
+S <- 5000
+I1_initial <- 11
+
+# Create a vector of length 37 with values between 0 and 2
+u1maxvec <- seq(0, 2, length.out = 37)
+
+# Initialize an empty data frame to store the results
+out.prob1 <- data.frame(u1max = numeric(0), dI1dt0 = numeric(0))
+
+# Loop over each value in u1maxvec and compute dI1dt0
+for (u1max in u1maxvec) {
+    dI1dt0 <- beta * S * (I1_initial + c * 0) - (mu + u1max) * I1_initial
+    
+    # Store the results in the data frame
+    out.prob1 <- rbind(out.prob1, data.frame(u1max = u1max, dI1dt0 = dI1dt0))
+}
+
+
+
+# Find the point of intersection where dI1dt0 crosses y = 0
+intercept_idx <- which(diff(sign(out.prob1$dI1dt0)) != 0)
+
+# Perform linear interpolation to find the exact intercept
+u1max_intercept <- with(out.prob1, 
+                        u1max[intercept_idx] - dI1dt0[intercept_idx] * 
+                        (u1max[intercept_idx + 1] - u1max[intercept_idx]) / 
+                        (dI1dt0[intercept_idx + 1] - dI1dt0[intercept_idx]))
+
+
+
+
+# Plotting with the intercept point, a vertical line, and text annotations
+  g.p1dI1dt0 <- ggplot(out.prob1, aes(x = u1max, y = dI1dt0)) + xlab("Community Isolation daily max, u1max") + 
+  ylab("Init. rate of change in community infections") +
+  geom_line(size = 2, color = cols[7]) +
+  geom_point(aes(x = u1max_intercept, y = 0), color = "red", size = 3) +
+  geom_vline(xintercept = u1max_intercept, linetype = "dotted", color = "blue", size = 1) +
+  annotate("text", x = u1max_intercept - 0.2, y = max(out.prob1$dI1dt0) * 0.08, label = "Mitigation", hjust = 1, size = 10) +
+  annotate("text", x = u1max_intercept + 0.2, y = max(out.prob1$dI1dt0) * 0.4, label = "Elimination", hjust = 0, size = 10) +
+  ggtitle(" ") + theme_classic() +
+  theme(
+  plot.title = element_text(size = 20),       # Title size
+  axis.title = element_text(size = 30),       # Axis title size
+  axis.text = element_text(size = 30),        # Axis text size
+  legend.title = element_text(size = 20),     # Legend title size
+  legend.text = element_text(size = 20) )      # Legend text size
+
+g.p1dI1dt0
+
+```
+
+
+
+
+```{r}
+
+#PROBLEM 2
+
+require(ggplot2)
+require(patchwork)
+
+cols <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7", "#66CC99")
+
+# Parameters
+beta <- 0.0002
+mu <- 0.334
+theta <- 2
+gamma <- 2*mu
+u1max <- 0.8
+S <- 5000
+I1_initial <- 11
+
+# Create a vector of length 37 with values between 0 and 2
+cvec <- seq(0, 2, length.out = 37)
+
+# Initialize an empty data frame to store the results
+out.prob2 <- data.frame(c = numeric(0), dI1dt0 = numeric(0))
+
+# Loop over each value in cvec and compute dI1dt0
+for (c in cvec) {
+    dI1dt0 <- beta * S * (I1_initial + c * (theta/gamma)) - (mu + u1max) * I1_initial
+    
+    # Store the results in the data frame
+    out.prob2 <- rbind(out.prob2, data.frame(c = c, dI1dt0 = dI1dt0))
+}
+
+
+
+# Find the point of intersection where dI1dt0 crosses y = 0
+intercept_idx <- which(diff(sign(out.prob2$dI1dt0)) != 0)
+
+# Perform linear interpolation to find the exact intercept
+c_intercept <- with(out.prob2, 
+                        c[intercept_idx] - dI1dt0[intercept_idx] * 
+                        (c[intercept_idx + 1] - c[intercept_idx]) / 
+                        (dI1dt0[intercept_idx + 1] - dI1dt0[intercept_idx]))
+
+
+
+
+# Plotting with the intercept point, a vertical line, and text annotations
+g.p2dI1dt0 <- ggplot(out.prob2, aes(x = c, y = dI1dt0)) +
+  geom_line(size = 2, color = cols[7]) +
+  geom_point(aes(x = c_intercept, y = 0), color = "red", size = 3) +
+  geom_vline(xintercept = c_intercept, linetype = "dotted", color = "blue", size = 1) +
+  annotate("text", x = c_intercept - 0.1, y = max(out.prob2$dI1dt0) * 0.08, label = "Elimination", hjust = 1, size = 10) +
+  annotate("text", x = c_intercept + 0.2, y = max(out.prob2$dI1dt0) * 0.8, label = "Mitigation", hjust = 0, size = 10) +
+  ggtitle(" ") + xlab("Relative transmissibility of travellers, c") + 
+  ylab("Init. rate of change in community infections") + theme_classic() +
+  theme(
+  plot.title = element_text(size = 20),       # Title size
+  axis.title = element_text(size = 30),       # Axis title size
+  axis.text = element_text(size = 30),        # Axis text size
+  legend.title = element_text(size = 20),     # Legend title size
+  legend.text = element_text(size = 20) )      # Legend text size
+
+g.p2dI1dt0
+
+```
+
+
+
+
+```{r}
+
+#PROBLEM 3
+require(ggplot2)
+require(patchwork)
+
+cols <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7", "#66CC99")
+
+# Parameters
+beta <- 0.0002
+mu <- 0.334
+c <- 1
+gamma <- 2*mu
+u1max <- 0.8
+S <- 5000
+I1_initial <- 11
+
+# Create a vector of length 37 with values between 0 and 2
+u2maxvec <- seq(0, 3, length.out = 37)
+
+# Initialize an empty data frame to store the results
+out.prob3 <- data.frame(u2max = numeric(0), dI1dt0 = numeric(0))
+
+# Loop over each value in u2maxvec and compute dI1dt0
+for (u2max in u2maxvec) {
+    dI1dt0 <- beta * S * (I1_initial + c * (theta/(gamma+u2max))) - (mu + u1max) * I1_initial
+    
+    # Store the results in the data frame
+    out.prob3 <- rbind(out.prob3, data.frame(u2max = u2max, dI1dt0 = dI1dt0))
+}
+
+
+
+# Find the point of intersection where dI1dt0 crosses y = 0
+intercept_idx <- which(diff(sign(out.prob3$dI1dt0)) != 0)
+
+# Perform linear interpolation to find the exact intercept
+u2max_intercept <- with(out.prob3, 
+                        u2max[intercept_idx] - dI1dt0[intercept_idx] * 
+                        (u2max[intercept_idx + 1] - u2max[intercept_idx]) / 
+                        (dI1dt0[intercept_idx + 1] - dI1dt0[intercept_idx]))
+
+
+
+
+# Plotting with the intercept point, a vertical line, and text annotations
+g.p3dI1dt0 <- ggplot(out.prob3, aes(x = u2max, y = dI1dt0)) +
+  geom_line(size = 2, color = cols[7]) +
+  geom_point(aes(x = u2max_intercept, y = 0), color = "red", size = 3) +
+  geom_vline(xintercept = u2max_intercept, linetype = "dotted", color = "blue", size = 1) +
+  annotate("text", x = u2max_intercept - 0.2, y = max(out.prob3$dI1dt0) * 0.08, label = "Mitigation", hjust = 1, size = 10) +
+  annotate("text", x = u2max_intercept + 0.2, y = max(out.prob3$dI1dt0) * 0.4, label = "Elimination", hjust = 0, size = 10) +
+  ggtitle(" ") + xlab("Post-arrival isolation daily max, u2max") + 
+  ylab("Init. rate of change in community infections") + theme_classic() +
+  theme(
+  plot.title = element_text(size = 20),       # Title size
+  axis.title = element_text(size = 30),       # Axis title size
+  axis.text = element_text(size = 30),        # Axis text size
+  legend.title = element_text(size = 20),     # Legend title size
+  legend.text = element_text(size = 20) )      # Legend text size
+
+g.p3dI1dt0
+
+```
+
+
+```{r}
+
+#PROBLEM 4
+
+# Load necessary libraries
+require(ggplot2)
+require(patchwork)
+
+# Define colors
+cols <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7", "#66CC99")
+
+# Parameters
+beta <- 0.0002
+mu <- 0.334
+gamma <- 2*mu
+c <- 1
+S <- 5000
+I1_initial <- 11
+theta <- 2 # Assuming theta is defined somewhere, otherwise adjust as needed
+gamma <- 1 # Assuming gamma is defined somewhere, otherwise adjust as needed
+
+# Create vectors for u1max and u2max
+u1maxvec <- seq(0, 2, length.out = 37)
+u2maxvec <- seq(0, 3, length.out = 37)
+
+# Initialize an empty data frame to store the results
+out.prob4 <- data.frame(u1max = numeric(0), u2max = numeric(0), dI1dt0 = numeric(0))
+
+# Loop over each value in u1maxvec and u2maxvec and compute dI1dt0
+for (u1max in u1maxvec) {
+    for (u2max in u2maxvec) {
+        # Calculate dI1dt0
+        dI1dt0 <- beta * S * (I1_initial + c * (theta/(gamma + u2max))) - (mu + u1max) * I1_initial
+    
+        # Store the results in the data frame
+        out.prob4 <- rbind(out.prob4, data.frame(u1max = u1max, u2max = u2max, dI1dt0 = dI1dt0))
+    }
+}
+
+
+# Generate the heatmap
+g.p4dI1dt0 <- ggplot(out.prob4, aes(x = u1max, y = u2max, fill = dI1dt0)) +
+  geom_tile() +
+  scale_fill_gradient2(low = "red", mid = "white", high = "orange", midpoint = 0) +
+  labs(title = " ", x = "Community isolation daily max (u1max)", y = "Post-arrival isolation daily max (u2max)", fill = "dI1/dt_0") +
+  theme_classic() +
+  theme(
+  plot.title = element_text(size = 20),       # Title size
+  axis.title = element_text(size = 30),       # Axis title size
+  axis.text = element_text(size = 30),        # Axis text size
+  legend.title = element_text(size = 20),     # Legend title size
+  legend.text = element_text(size = 20) )+    # Legend text size 
+  
+  # Add the "Elimination" text in the red region
+  annotate("text", x = 1.5, y = 0.5, label = "Elimination", angle = 45, color = "red", size = 10, fontface = "bold") +
+  
+  # Add the "Suppression" text in the orange region
+  annotate("text", x = 0.3, y = 2.0, label = "Mitigation", angle = 45, color = "orange", size = 10, fontface = "bold")
+
+# Display the plot
+g.p4dI1dt0
+
+
+
+```
+
+
+
+
+```{r}
+
+#Combine plots
+
+chap3figures <- (g.p1dI1dt0 + g.p2dI1dt0) / (g.p3dI1dt0 + g.p4dI1dt0) + 
+                plot_annotation(tag_levels = 'a') & theme(plot.tag = element_text(size = 25))
+
+chap3figures
+
+```
+
+
+
+
+

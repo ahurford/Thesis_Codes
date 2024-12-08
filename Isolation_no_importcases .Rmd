@@ -1,0 +1,248 @@
+---
+title: "Code for Figure 4.1: The possible controls categorized as different types of public health strate-
+gies for the community isolation-only model"
+output: html_notebook
+---
+
+```{r}
+require(deSolve)
+require(ggplot2)
+require(patchwork)
+cols <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7", "#66CC99")
+
+### The aim of this code is to make a figure that illustrates
+### the isolation-only strategy (without importation) in terms of Hansen & Day
+### in terms of the public health terminology that I defined
+#### elimination, mitigation, and circuit breaker.
+
+
+##### Parameters
+# max daily rate of community member isolation
+u1max <- 0.8
+
+# constraint on community member isolation
+C1max <- 1500
+
+# transmission rate
+beta<- 0.0002
+
+# importation rate
+theta <- 0
+
+mu <- 0.334
+# relative transmissibility of travellers
+c <- 1
+
+T <- 500
+
+# start time for community isolation
+tstart1 <- 0
+# in case we wanted to do two switches
+toff1 <- 1000 # currently set to not turn-off
+
+
+# community isolation function
+u1fun<-function(t){
+  u1 = u1max
+  if(t < tstart1){
+  u1 = 0}
+  if( t > toff1 & t < (toff1+10)){
+    u1 = 0
+  }
+  return(u1)
+}
+
+
+
+# This is designed to trigger termination of the simulation when I1 < 0.5
+rootfun <- function(t, y, parameters){
+  I1 = y[2]
+  # However, with importations, it doesn't make sense to have this as
+  # the endpoint of the simulation, so instead I just set Imin = 0 and have
+  # the simulation end at T=100.
+  y1 = 1 - I1 
+  return(y1)
+}
+
+
+SI<-function(t, y, parameters){
+  S = y[1]
+  I1 = y[2]
+  I2 = y[3]
+  C1 = y[4]
+  iso = y[5]
+  u1 = u1fun(t)
+  
+  
+  if(C1 > C1max){
+    u1 = 0
+  }
+  
+  
+  dS = - beta*S*(I1 + c*I2)
+  dI1 = beta*S*(I1 + c*I2) - mu*I1 - u1*I1
+  dI2 = theta - 2*mu*I2
+  dC1 = u1*I1
+  diso = u1*I1 - mu*iso
+  return(list(c(dS,dI1,dI2,dC1,diso)))
+}
+
+### ELIMINATION
+out1 <- ode(y = c(S = 5000, I1 = 11, I2 = theta/((2*mu)), C1 = 0, iso = 0), parms = NULL, times = seq(0,T,.05), func = SI, events = list(func = NULL, root = TRUE, terminalroot = 1), rootfun=rootfun)
+
+out1<- data.frame(out1)
+
+J1 = cumsum(beta*out1$S*(out1$I1+c*out1$I2)*diff(c(0,out1$time)))
+J.elim <- J1
+
+u1 = rep(0,length(J1))
+
+u1[which(diff(c(out1$C1[1],out1$C1))*diff(c(0,out1$time)) > 0.001)] = max(c(out1$I1,out1$iso))
+
+out.elim <- data.frame(out1, u=u1, j = J1)
+
+g.elim = ggplot(out.elim, aes(x = time, y = I1)) +
+  geom_ribbon(aes(ymin = 0, ymax = u), fill = cols[7], alpha = 0.2)+
+  geom_line(color = cols[7], size = 2)+
+
+  ggtitle("Elimination")+ylab("Community prevalence") + xlim(0,20)+theme_classic() +
+  theme(
+  plot.title = element_text(size = 20),       # Title size
+  axis.title = element_text(size = 30),       # Axis title size
+  axis.text = element_text(size = 30),        # Axis text size
+  legend.title = element_text(size = 20),     # Legend title size
+  legend.text = element_text(size = 20) )      # Legend text size
+
+g.elim
+
+
+```
+
+
+
+
+```{r}
+##### SUPPRESSION (same parameters except a lower u1max)
+u1max <- 0.6 
+out2 <- ode(y = c(S = 5000, I1 = 11, I2 = 0, C1 = 0, iso = 0), parms = NULL, times = seq(0,T,.05), func = SI, events = list(func = NULL, root = TRUE, terminalroot = 1), rootfun=rootfun)
+out2 <- data.frame(out2)
+
+out.supp<-data.frame(out2)
+
+J2 = cumsum(beta*out2$S*(out2$I1+c*out2$I2)*diff(c(0,out2$time)))
+J.supp <- J2
+
+u2 = rep(0,length(J2))
+u2[which(diff(c(out2$C1[1],out2$C1))*diff(c(0,out2$time))>0.001)] = max(c(out2$I1,out2$iso))
+out.supp <- data.frame(out2,u=u2, j = J2)
+
+g.supp = ggplot(out.supp, aes(x = time, y = I1)) +
+  geom_ribbon(aes(ymin = 0, ymax = u), fill = cols[2], alpha = 0.2)+
+  geom_line(color = cols[2], size = 2)+
+  ggtitle("Mitigation")+ylab("") + xlim(0,80) +theme_classic() +
+  theme(
+  plot.title = element_text(size = 20),       # Title size
+  axis.title = element_text(size = 30),       # Axis title size
+  axis.text = element_text(size = 30),        # Axis text size
+  legend.title = element_text(size = 20),     # Legend title size
+  legend.text = element_text(size = 20) )      # Legend text size
+
+g.supp
+
+```
+
+
+
+
+```{r}
+###### CIRCUIT BREAKER (a lower value of the constraint)
+### (also times of on and off to illustrate that timing doesn't matter)
+C1max <- 500
+#T = 70
+toff1<-10
+out3 <- ode(y = c(S=5000, I1=11, I2=0, C1=0, iso=0), parms = NULL, times = seq(0,T,.05), func = SI, events = list(func = NULL, root = TRUE, terminalroot = 1), rootfun=rootfun)
+
+out3 <- data.frame(out3)
+out.circ<-out3
+
+J3 = cumsum(beta*out3$S*(out3$I1+c*out3$I2)*diff(c(0,out3$time)))
+u3 = rep(0,length(J3))
+u3[which(diff(c(out3$C1[1],out3$C1))*diff(c(0,out3$time))>0.001)] = max(c(out3$I1,out3$iso))
+
+out.circ <- data.frame(out3, u=u3, j=J3)
+
+g.circ = ggplot(out.circ, aes(x = time, y = I1)) +
+  geom_ribbon(aes(ymin = 0, ymax = u), fill = cols[4], alpha = 0.2)+
+  geom_line(color = cols[4], size = 2)+ggtitle("Circuit breaker 1")+ylab("Community prevalence") + xlim(0,60) + theme_classic() +
+  theme(
+  plot.title = element_text(size = 20),       # Title size
+  axis.title = element_text(size = 30),       # Axis title size
+  axis.text = element_text(size = 30),        # Axis text size
+  legend.title = element_text(size = 20),     # Legend title size
+  legend.text = element_text(size = 20) )      # Legend text size
+
+g.circ
+
+```
+
+
+
+
+```{r}
+#### A different circuit-breaker with the same parameters as above
+tstart1<-5
+toff1<-1000
+out4 <- ode(y = c(S=5000,I1=11,I2=0,C1=0,iso=0), parms = NULL, times = seq(0,T,.05), func = SI, events = list(func = NULL, root = TRUE, terminalroot = 1), rootfun=rootfun)
+out4 <- data.frame(out4)
+out.circ.2<-out4
+
+J4 = cumsum(beta*out4$S*(out4$I1+c*out4$I2)*diff(c(0,out4$time)))
+u4 = rep(0,length(J4))
+u4[which(diff(c(out4$C1[1],out4$C1))*diff(c(0,out4$time))>0.001)] = max(c(out4$I1,out4$iso))
+out.circ2 <- data.frame(out4, u = u4,j = J4)
+print(tail(out4$C1,1))
+
+
+g.circ.2 = ggplot(out.circ2, aes(x = time, y = I1)) +
+  geom_ribbon(aes(ymin = 0, ymax = u), fill = cols[6], alpha = 0.2)+
+  geom_line(color = cols[6], size = 2)+
+  ggtitle("Circuit breaker 2")+ylab("") + xlim(0,50) + theme_classic() +
+  theme(
+  plot.title = element_text(size = 20),       # Title size
+  axis.title = element_text(size = 30),       # Axis title size
+  axis.text = element_text(size = 30),        # Axis text size
+  legend.title = element_text(size = 20),     # Legend title size
+  legend.text = element_text(size = 20) )      # Legend text size
+
+g.circ.2
+
+```
+
+
+
+```{r fig.width=12, fig.height=7}
+### Cumulative Cases for Circuit Breakers ###
+J.circ = ggplot()+
+  geom_ribbon(data=out.circ,aes(x=time,ymin = 0, ymax = u3*(max(J3)/max(I1))), fill = cols[4], alpha = 0.2)+
+  geom_ribbon(data=out.circ.2,aes(x=time,ymin = 0, ymax = u4*(max(J4)/max(I1))), fill = cols[6], alpha = 0.2)+
+  geom_line(data=out.circ, aes(x = time, y = J3),color = cols[4], size = 2)+
+  geom_line(data=out.circ.2, aes(x = time, y = J4),color = cols[6], size = 2)+ylab("Cumulative cases")+ggtitle("Circuit breaker 1 & 2 equivalence")+theme_classic() +
+  theme(
+  plot.title = element_text(size = 20),       # Title size
+  axis.title = element_text(size = 30),       # Axis title size
+  axis.text = element_text(size = 30),        # Axis text size
+  legend.title = element_text(size = 20),     # Legend title size
+  legend.text = element_text(size = 20) )      # Legend text size
+
+g1=g.elim+g.supp
+g2=g.circ+g.circ.2
+fig = g1/g2/J.circ+
+  plot_annotation(tag_levels = 'a') & theme(plot.tag = element_text(size = 25)) -> r
+r
+
+```
+
+
+
+
+

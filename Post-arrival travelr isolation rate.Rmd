@@ -1,0 +1,170 @@
+---
+title: "Code for Figure 3.3: The effect of the post-arrival traveler isolation rate (u2max) on community
+infection prevalence"
+#output: A plot of U2_[u2max](T) against time for different values of u2max.
+date: Aug 08, 2024
+---
+
+
+```{r}
+
+
+require(deSolve)
+require(ggplot2)
+require(patchwork)
+require(ggpubr)
+
+cols <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7", "#66CC99")
+
+##### Parameters
+c <- 1
+U2max1 <- 50
+U2max <- U2max1
+beta <- 0.0002
+theta <- 2
+mu <- 0.334
+T <- 1000
+tstart1 <- 0
+toff1 <- 100
+Imin <- 1
+
+
+# This is designed to trigger termination of the simulation when I1 < 1
+rootfun <- function(t, y, parameters){
+  I1 = y[2]
+  y1 = Imin - I1 
+  return(y1)
+}
+
+SI <- function(t, y, parameters) {
+  S <- y[1]
+  I1 <- y[2]
+  I2 <- y[3]
+  U2 <- y[4]
+  u2<-u2max
+    if(U2 > U2max){
+    u2 = 0
+  }
+  
+  dS = - beta*S*(I1 + c*I2) 
+  dI1 = beta*S*(I1 + c*I2) - mu*I1
+  dI2 = theta - 2*mu*I2 - u2*I2
+  dU2 = u2*I2
+  return(list(c(dS,dI1,dI2,dU2)))
+  
+}
+
+# Simulation for different values of u2max
+u2maxvec <- c(0, 0.5, 1,2,3,5)
+
+DataProb <- NULL
+for (u2max in u2maxvec) {
+  parameters <- list(u2max = u2max)
+  
+  out1 <- ode(y = c(S = 5000, I1 = 10, I2 = theta/((2*mu) + u2max), U2 = 0), parms = parameters, times = seq(0,T,.05), func = SI, events = list(func = NULL, root = TRUE, terminalroot = 1), rootfun=rootfun)
+  
+  
+  
+  out1 <- data.frame(out1)
+  J1 <- cumsum(beta * out1$S * (out1$I1 + c * out1$I2) * diff(c(0, out1$time)))
+  u <- rep(0, length(J1))
+  u[which(diff(c(out1$U2[1], out1$U2)) * diff(c(0, out1$time)) > 0.001)] <- max(c(out1$I2, out1$iso))
+  
+  DataProb <- rbind(DataProb, data.frame(out1, u = u, j = J1, u2max = u2max))
+}
+
+
+# run again with low beta
+beta <- beta/4
+U2max <- 500
+T<-2000
+u2maxvec = c(0,.5,1, 3,5)
+
+DataProb2 <- NULL
+for (u2max in u2maxvec) {
+  parameters <- list(u2max = u2max)
+  
+  out1 <- ode(y = c(S = 5000, I1 = 10, I2 = theta/((2*mu) + u2max), U2 = 0), parms = parameters, times = seq(0,T,.05), func = SI, events = list(func = NULL, root = TRUE, terminalroot = 1), rootfun=rootfun)
+  
+  
+  
+  out1 <- data.frame(out1)
+  J1 <- cumsum(beta * out1$S * (out1$I1 + c * out1$I2) * diff(c(0, out1$time)))
+  u <- rep(0, length(J1))
+  u[which(diff(c(out1$U2[1], out1$U2)) * diff(c(0, out1$time)) > 0.001)] <- max(c(out1$I2, out1$iso))
+  
+  DataProb2 <- rbind(DataProb2, data.frame(out1, u = u, j = J1, u2max = u2max))
+}
+
+
+# Plotting
+g.tr <- ggplot(DataProb, aes(x = time, y = I1, color = factor(u2max))) +
+  geom_line(size = 1) +
+  #ggtitle("Community infections increase initially") + 
+  ylab(expression(paste("Community prevalence,", I[1](t)))) + xlim(0, 50) + 
+  theme_classic() +
+  scale_color_discrete(name = expression(paste(u[2][max]))) +
+  #scale_y_continuous(breaks = seq(min(out1$I1)*0, max(out1$I1), by = 200)) +
+  #scale_x_continuous(breaks = seq(min(out1$time), max(out1$time), by = 5))
+  theme(
+  plot.title = element_text(size = 20),       # Title size
+  axis.title = element_text(size = 30),       # Axis title size
+  axis.text = element_text(size = 30),        # Axis text size
+  legend.title = element_text(size = 25),     # Legend title size
+  legend.text = element_text(size = 25) )      # Legend text size
+
+g.tr.2 <- ggplot(DataProb2, aes(x = time, y = I1, color = factor(u2max))) +
+  geom_hline(aes(yintercept = Imin), color = "black", linetype = "dashed")+
+  geom_line(size = 1) +
+  #ggtitle("Community infections decrease initially") + 
+  ylab(expression(paste("Community prevalence,", I[1](t)))) + 
+  theme_classic() +
+  ylim(c(0,11))+
+  annotate("text", x = 0.9*T, y = 0.75*Imin, label = "Imin", color = "black", size = 4)+
+  scale_color_discrete(name = expression(paste(u[2][max]))) + 
+  #scale_y_continuous(breaks = seq(min(out1$I1)*0, max(out1$I1), by = 200)) +
+  #scale_x_continuous(breaks = seq(min(out1$time), max(out1$time), by = 5))
+  theme(
+  plot.title = element_text(size = 20),       # Title size
+  axis.title = element_text(size = 30),       # Axis title size
+  axis.text = element_text(size = 30),        # Axis text size
+  legend.title = element_text(size = 25),     # Legend title size
+  legend.text = element_text(size = 25) )      # Legend text size
+
+g.U2 <- ggplot(DataProb, aes(x = time, y = U2, color = factor(u2max))) +
+  geom_line(size = 1) +
+  geom_hline(aes(yintercept = U2max1), color = "black", linetype = "dashed")  +
+  annotate("text", x = 15, y = 0.9*U2max1, label = expression(paste(U[2][max])), hjust = -0.1, vjust = -2, color = "black", size = 5) +
+  ggtitle(" ") + ylab(expression(paste("Total isolated travelers,", U[2](T))))  + theme_classic() +
+  scale_color_discrete(name = expression(paste(u[2][max]))) + 
+  #scale_y_continuous(breaks = seq(min(DataProb$U2), max(DataProb$U2), by = 5)) +
+  #scale_x_continuous(breaks = seq(min(out1$time), max(out1$time), by = 5))
+  theme(
+  plot.title = element_text(size = 20),       # Title size
+  axis.title = element_text(size = 30),       # Axis title size
+  axis.text = element_text(size = 30),        # Axis text size
+  legend.title = element_text(size = 25),     # Legend title size
+  legend.text = element_text(size = 25) )      # Legend text size
+
+g.U2.2 <- ggplot(DataProb2, aes(x = time, y = U2, color = factor(u2max))) +
+  geom_line(size = 1) +
+  geom_hline(aes(yintercept = U2max), color = "black", linetype = "dashed")  +
+  annotate("text", x = 20, y = U2max, label = expression(paste(U[2][max])), hjust = -0.1, vjust = -0.3, color = "black", size = 5) +
+  ggtitle(" ") + ylab(expression(paste("Total isolated travelers,", U[2](T))))  + theme_classic() +
+  scale_color_discrete(name = expression(paste(u[2][max]))) +
+  #scale_y_continuous(breaks = seq(min(DataProb$U2), max(DataProb$U2), by = 5)) +
+  #scale_x_continuous(breaks = seq(min(out1$time), max(out1$time), by = 5))
+  theme(
+  plot.title = element_text(size = 20),       # Title size
+  axis.title = element_text(size = 30),       # Axis title size
+  axis.text = element_text(size = 30),        # Axis text size
+  legend.title = element_text(size = 25),     # Legend title size
+  legend.text = element_text(size = 25) )      # Legend text size
+
+```
+
+```{r}
+chap2.prob3 <- g.tr+g.U2+g.tr.2+g.U2.2 + plot_annotation(tag_levels = "a") & theme(plot.tag = element_text(size = 25))
+
+chap2.prob3
+```
