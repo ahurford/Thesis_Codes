@@ -69,7 +69,8 @@ for (u2max in u2maxvec) {
   u <- rep(0, length(J1))
   u[which(diff(c(out1$U2[1], out1$U2)) * diff(c(0, out1$time)) > 0.001)] <- max(c(out1$I2, out1$iso))
   
-  DataProb <- rbind(DataProb, data.frame(out1, u = u, j = J1, u2max = u2max, T = max(out1$time)))
+  DataProb <- rbind(DataProb, data.frame(out1, u = u, j = J1, u2max = u2max))
+                    print(max(out1$time))
 }
 
 
@@ -92,7 +93,8 @@ for (u2max in u2maxvec) {
   u <- rep(0, length(J1))
   u[which(diff(c(out1$U2[1], out1$U2)) * diff(c(0, out1$time)) > 0.001)] <- max(c(out1$I2, out1$iso))
   
-  DataProb2 <- rbind(DataProb2, data.frame(out1, u = u, j = J1, u2max = u2max, T = max(out1$time)))
+  DataProb2 <- rbind(DataProb2, data.frame(out1, u = u, j = J1, u2max = u2max))
+  print(max(out1$time))
 }
 
 
@@ -109,8 +111,9 @@ g.tr <- ggplot(DataProb, aes(x = time, y = I1, color = factor(u2max))) +
   #scale_y_continuous(breaks = seq(min(out1$I1)*0, max(out1$I1), by = 200)) +
   #scale_x_continuous(breaks = seq(min(out1$time), max(out1$time), by = 5))
   annotate("text", x = 47, y = 55, label = "Imin", color = "black", size = 4)+
+  ggtitle("Prevalence increases initially")+
   theme(
-  plot.title = element_text(size = 10),       # Title size
+  plot.title = element_text(size = 15),       # Title size
   axis.title = element_text(size = 15),       # Axis title size
   axis.text = element_text(size = 15),        # Axis text size
   legend.title = element_text(size = 15),     # Legend title size
@@ -123,12 +126,13 @@ g.tr.2 <- ggplot(DataProb2, aes(x = time, y = I1, color = factor(u2max))) +
   ylab(expression(paste("Community prevalence,", I[1](t)))) + 
   theme_classic() +
   ylim(c(0,11))+
+  ggtitle("Prevalence decreases initially")+
   annotate("text", x = 0.9*T, y = 0.5*Imin, label = "Imin", color = "black", size = 4)+
   scale_color_discrete(name = expression(paste(u[2][max]))) + 
   #scale_y_continuous(breaks = seq(min(out1$I1)*0, max(out1$I1), by = 200)) +
   #scale_x_continuous(breaks = seq(min(out1$time), max(out1$time), by = 5))
   theme(
-  plot.title = element_text(size = 10),       # Title size
+  plot.title = element_text(size = 15),       # Title size
   axis.title = element_text(size = 15),       # Axis title size
   axis.text = element_text(size = 15),        # Axis text size
   legend.title = element_text(size = 15),     # Legend title size
